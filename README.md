@@ -1,6 +1,11 @@
-# Flink OushuDB Sink Function使用方法
+# Flink OushuDB Sink Function
 
-### 引用
+将Flink处理完成的数据高效的写入OushuDB，实现了Exactly-Once提交。OushuDB Sink Function是基于
+Flink提供的TwoPhaseCommitSinkFunction类实现。OushuDB Sink Function先将数据用ORC格式写入HDFS临时文件，在Flink完成Checkpoint保存完成时写入数据库。
+
+##使用方法
+
+* 引用
 ```xml
 	<dependency>
 		<groupId>org.apache.flink</groupId>
@@ -15,7 +20,7 @@
 	</dependency>
 ```
 
-### 创建一个OushuDB sinker
+* 创建一个OushuDB sinker
 ```java
 import org.apache.flink.table.types.logical.*;
 
@@ -47,7 +52,7 @@ public class Demo {
 }
 ```
 
-### 编译插件，将依赖打到jar包
+* 编译插件，将依赖打到jar包
 ```xml
 <plugin>
     <groupId>org.apache.maven.plugins</groupId>
