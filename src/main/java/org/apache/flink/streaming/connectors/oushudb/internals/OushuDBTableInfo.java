@@ -152,7 +152,7 @@ public class OushuDBTableInfo implements Serializable {
             statement = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
             StringBuilder sb = new StringBuilder();
             // create external table
-            sb.append("create external table ");
+            sb.append("create readable external table ");
             sb.append(withQuotation(schema));
             sb.append(".");
             sb.append(withQuotation(externalTable));

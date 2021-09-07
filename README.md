@@ -9,7 +9,7 @@ Flink提供的TwoPhaseCommitSinkFunction类实现。OushuDB Sink Function先将�
 ```xml
 	<dependency>
 		<groupId>org.apache.flink</groupId>
-		<artifactId>flink-connector-oushudb_1.11</artifactId>
+		<artifactId>flink-connector-oushudb_2.11</artifactId>
 		<version>1.13.0</version>
 	</dependency>
 
