@@ -209,8 +209,13 @@ public class OushuDBTableInfo implements Serializable {
         public String typeStr() {
             switch (type.getTypeRoot()) {
                 case CHAR:
+                    return String.format("char(%d)", ((CharType)type).getLength());
                 case VARCHAR:
-                    return "text";
+                    int len = ((VarCharType)type).getLength();
+                    if (len == 2147483647) {
+                        return "text";
+                    }
+                    return String.format("varchar(%d)", len);
                 case BOOLEAN:
                     return "bool";
                 case BINARY:
