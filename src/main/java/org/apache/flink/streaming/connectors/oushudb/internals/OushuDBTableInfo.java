@@ -87,7 +87,7 @@ public class OushuDBTableInfo implements Serializable {
         checkConnection();
 
         String existsSql = String.format("select count(1) as cnt from information_schema.tables " +
-            "where table_schema = '%s' and table_name = '%s';", schema, table);
+                "where table_schema = '%s' and table_name = '%s';", schema, table);
         PreparedStatement prst = null;
         try {
             prst = connection.prepareStatement(existsSql);
@@ -104,10 +104,10 @@ public class OushuDBTableInfo implements Serializable {
         return false;
     }
 
-    public boolean checkCompatibility() throws Exception {
+    public void checkCompatibility() throws Exception {
         checkConnection();
-        String typeSql = String.format("select column_name, data_type, numeric_precision, numeric_scale from information_schema.columns " +
-            "where table_schema='%s' and table_name = '%s' order by ordinal_position;", schema, table);
+        String typeSql = String.format("select column_name, data_type, character_maximum_length, numeric_precision, numeric_scale from information_schema.columns " +
+                "where table_schema='%s' and table_name = '%s' order by ordinal_position;", schema, table);
         PreparedStatement prst = null;
         try {
             prst = connection.prepareStatement(typeSql);
@@ -115,10 +115,11 @@ public class OushuDBTableInfo implements Serializable {
             List<DBField> fields = new ArrayList<>();
             while (result.next()) {
                 fields.add(new DBField(
-                    result.getString("column_name"),
-                    result.getString("data_type"),
-                    result.getInt("numeric_precision"),
-                    result.getInt("numeric_scale")
+                        result.getString("column_name"),
+                        result.getString("data_type"),
+                        result.getInt("character_maximum_length"),
+                        result.getInt("numeric_precision"),
+                        result.getInt("numeric_scale")
                 ));
             }
 
@@ -126,7 +127,8 @@ public class OushuDBTableInfo implements Serializable {
                 DBField df = fields.get(i);
                 Field f = this.fields[i];
                 if (!f.typeStr().equals(df.typeStr())) {
-                    return false;
+                    throw new FlinkOushuDBException(FlinkOushuDBErrorCode.EXTERNAL_ERROR, "Insert data type " + f.typeStr() +
+                            " is incompatible with table type " + df.typeStr());
                 }
             }
         } finally {
@@ -134,7 +136,6 @@ public class OushuDBTableInfo implements Serializable {
                 prst.close();
             }
         }
-        return true;
     }
 
 
@@ -209,11 +210,11 @@ public class OushuDBTableInfo implements Serializable {
         public String typeStr() {
             switch (type.getTypeRoot()) {
                 case CHAR:
-                    return String.format("char(%d)", ((CharType)type).getLength());
+                    return String.format("char(%d)", ((CharType) type).getLength());
                 case VARCHAR:
-                    int len = ((VarCharType)type).getLength();
+                    int len = ((VarCharType) type).getLength();
                     if (len == 2147483647) {
-                        return "text";
+                        return "varchar";
                     }
                     return String.format("varchar(%d)", len);
                 case BOOLEAN:
@@ -239,7 +240,7 @@ public class OushuDBTableInfo implements Serializable {
                 case DOUBLE:
                     return "double precision";
                 case TIMESTAMP_WITHOUT_TIME_ZONE:
-                    return "timestamp";
+                    return "timestamp without time zone";
                 case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                     return "timestamp with time zone";
                 default:
@@ -252,12 +253,14 @@ public class OushuDBTableInfo implements Serializable {
         private static final long serialVersionUID = -8687308305671173380L;
         public String name;
         public String type;
+        public int charMaxLen;
         public int precision;
         public int scale;
 
-        public DBField(String name, String type, int precision, int scale) {
+        public DBField(String name, String type, int charMaxLen, int precision, int scale) {
             this.name = name;
             this.type = type;
+            this.charMaxLen = charMaxLen;
             this.precision = precision;
             this.scale = scale;
         }
@@ -266,6 +269,13 @@ public class OushuDBTableInfo implements Serializable {
             switch (type) {
                 case "numeric":
                     return String.format("numeric(%d, %d)", precision, scale);
+                case "character varying":
+                    if(charMaxLen > 0 ) {
+                        return String.format("varchar(%d)", charMaxLen);
+                    }
+                    return "varchar";
+                case "character":
+                    return String.format("char(%d)", charMaxLen);
                 default:
                     return type;
             }
