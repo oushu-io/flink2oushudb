@@ -141,9 +141,7 @@ public class FlinkOrcInternalWriter {
 
     private void commitToOushuDB() throws Exception {
         if (this.tableInfo.exists()) {
-            if (!this.tableInfo.checkCompatibility()) {
-                throw new FlinkOushuDBException(FlinkOushuDBErrorCode.EXTERNAL_ERROR, "Insert data is incompatible with table types.");
-            }
+            this.tableInfo.checkCompatibility();
         } else {
             this.tableInfo.createTable();
         }
