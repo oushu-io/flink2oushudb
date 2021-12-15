@@ -3,7 +3,7 @@
 将Flink处理完成的数据高效的写入OushuDB，实现了Exactly-Once提交。OushuDB Sink Function是基于
 Flink提供的TwoPhaseCommitSinkFunction类实现。OushuDB Sink Function先将数据用ORC格式写入HDFS临时文件，在Flink完成Checkpoint保存完成时写入数据库。
 
-##使用方法
+## 使用方法
 
 * 引用
 ```xml
@@ -101,6 +101,6 @@ public class Demo {
 
 
 
-##支持版本
+## 支持版本
 Apache Flink v1.13.0 至最新版本
 
