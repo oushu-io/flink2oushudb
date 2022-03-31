@@ -7,15 +7,16 @@
 	<parent>
 		<artifactId>flink-connectors</artifactId>
 		<groupId>org.apache.flink</groupId>
-		<version>1.13.0</version>
+		<version>1.14.3</version>
 	</parent>
 
-	<artifactId>flink-connector-oushudb_${scala.binary.version}</artifactId>
+	<artifactId>flink-connector-oushudb_2.11</artifactId>
 	<name>Flink : Connectors : OushuDB</name>
 
 	<packaging>jar</packaging>
 
 	<properties>
+<!--		<scala.binary.version>2.12</scala.binary.version>-->
 		<postgres.version>42.2.10</postgres.version>
 	</properties>
 
@@ -67,13 +68,13 @@
 			<scope>provided</scope>
 			<optional>true</optional>
 		</dependency>
-		<dependency>
-			<groupId>org.apache.flink</groupId>
-			<artifactId>flink-table-planner-blink_${scala.binary.version}</artifactId>
-			<version>${project.version}</version>
-			<scope>provided</scope>
-			<optional>true</optional>
-		</dependency>
+<!--		<dependency>-->
+<!--			<groupId>org.apache.flink</groupId>-->
+<!--			<artifactId>flink-table-planner-blink_${scala.binary.version}</artifactId>-->
+<!--			<version>${project.version}</version>-->
+<!--			<scope>provided</scope>-->
+<!--			<optional>true</optional>-->
+<!--		</dependency>-->
 
 		<dependency>
 			<groupId>org.apache.flink</groupId>
@@ -149,4 +150,25 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<distributionManagement>
+		<!--发布版本仓库-->
+		<repository>
+			<!--nexus服务器中用户名：在settings.xml中和<server>的id一致-->
+			<id>oushuRepo</id>
+			<!--自定义名称-->
+			<name>RELEASES PUBLISH</name>
+			<!--仓库地址-->
+			<url>http://139.217.115.115:9081/content/repositories/releases</url>
+		</repository>
+		<!--快照版本仓库-->
+		<snapshotRepository>
+			<!--nexus服务器中用户名：在settings.xml中和<server>的id一致-->
+			<id>snapshots</id>
+			<!--自定义名称-->
+			<name>SNAPSHOTS PUBLISH</name>
+			<!--仓库地址-->
+			<url>http://139.217.115.115:9081/content/repositories/snapshots/</url>
+		</snapshotRepository>
+	</distributionManagement>
 </project>
