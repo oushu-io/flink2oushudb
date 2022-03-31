@@ -18,7 +18,6 @@ import org.apache.flink.orc.vector.Vectorizer;
 import org.apache.flink.orc.writer.OrcBulkWriterFactory;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
-import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
 import org.apache.flink.streaming.api.functions.sink.TwoPhaseCommitSinkFunction;
 import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.flink.streaming.connectors.oushudb.internals.FlinkOrcInternalWriter;
@@ -28,11 +27,15 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.ExceptionUtils;
+
+import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
+
 import org.apache.orc.TypeDescription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
 import java.sql.Connection;
@@ -45,10 +48,12 @@ import java.util.concurrent.LinkedBlockingDeque;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
-/**
- * Flink Sink to data into OushuDB
- */
-public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkOushuDBSink.OushuDBTransactionState, FlinkOushuDBSink.OushuDBTransactionContext> {
+/** Flink Sink to data into OushuDB */
+public class FlinkOushuDBSink
+        extends TwoPhaseCommitSinkFunction<
+                RowData,
+                FlinkOushuDBSink.OushuDBTransactionState,
+                FlinkOushuDBSink.OushuDBTransactionContext> {
 
     public static final String OUSHUDB_HOSTS = "oushudb.hosts";
     public static final String OUSHUDB_PORT = "oushudb.port";
@@ -62,66 +67,44 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
 
     private static final long serialVersionUID = -1974448328476882174L;
 
-
-    /**
-     * Properties for OushuDB
-     **/
+    /** Properties for OushuDB */
     protected final Properties oushuDBConfig;
 
     protected final Vectorizer<RowData> vectorizer;
 
     protected final OushuDBTableInfo tableInfo;
 
-    /**
-     * OushuDB SQL connection
-     **/
+    /** OushuDB SQL connection */
     protected Connection connection;
 
-    /**
-     * ORC writer factory
-     **/
+    /** ORC writer factory */
     private OrcBulkWriterFactory<RowData> writerFactory;
 
     private String temporary;
 
-    /**
-     * Errors encountered in the async producer are stored here.
-     */
-    @Nullable
-    protected transient volatile Exception asyncException;
-    /**
-     * Pool of available transactional ids.
-     */
+    /** Errors encountered in the async producer are stored here. */
+    @Nullable protected transient volatile Exception asyncException;
+    /** Pool of available transactional ids. */
     private final BlockingDeque<String> availableTransactionalIds = new LinkedBlockingDeque<>();
-
 
     public static final int DEFAULT_ORC_WRITER_POOL_SIZE = 5;
 
-    /**
-     * HDFS file system
-     **/
+    /** HDFS file system */
     private FileSystem fs;
 
     private static final ListStateDescriptor<FlinkOushuDBSink.NextTransactionalIdHint>
-        NEXT_TRANSACTIONAL_ID_HINT_DESCRIPTOR =
-        new ListStateDescriptor<>(
-            "next-transactional-id-hint",
-            new NextTransactionalIdHintSerializer());
+            NEXT_TRANSACTIONAL_ID_HINT_DESCRIPTOR =
+                    new ListStateDescriptor<>(
+                            "next-transactional-id-hint", new NextTransactionalIdHintSerializer());
 
-    /**
-     * State for nextTransactionalIdHint.
-     */
+    /** State for nextTransactionalIdHint. */
     private transient ListState<FlinkOushuDBSink.NextTransactionalIdHint>
-        nextTransactionalIdHintState;
+            nextTransactionalIdHintState;
 
-    /**
-     * Generator for Transactional IDs.
-     */
+    /** Generator for Transactional IDs. */
     private transient TransactionalIdsGenerator transactionalIdsGenerator;
 
-    /**
-     * Hint for picking next transactional id.
-     */
+    /** Hint for picking next transactional id. */
     private transient NextTransactionalIdHint nextTransactionalIdHint;
 
     private int poolSize;
@@ -129,7 +112,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     /**
      * Creates a FlinkOushuDBSink for a given tableInfo.
      *
-     * @param tableInfo  OushuDB table information
+     * @param tableInfo OushuDB table information
      * @param oushuDBConfig OushuDB connection information
      */
     public FlinkOushuDBSink(OushuDBTableInfo tableInfo, Properties oushuDBConfig) {
@@ -139,19 +122,19 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     /**
      * Creates a FlinkOushuDBSink for a given tableInfo.
      *
-     * @param tableInfo  OushuDB table information
+     * @param tableInfo OushuDB table information
      * @param oushuDBConfig OushuDB connection information
      */
     public FlinkOushuDBSink(OushuDBTableInfo tableInfo, Properties oushuDBConfig, int poolSize) {
         super(
-            new FlinkOushuDBSink.TransactionStateSerializer(),
-            new FlinkOushuDBSink.ContextStateSerializer());
+                new FlinkOushuDBSink.TransactionStateSerializer(),
+                new FlinkOushuDBSink.ContextStateSerializer());
 
         this.tableInfo = checkNotNull(tableInfo, "tableInfo is null");
         LogicalType[] types = tableInfo.getFieldsType();
-        TypeDescription typeDescription = OrcSplitReaderUtil.logicalTypeToOrcType(RowType.of(
-            tableInfo.getFieldsType(),
-            tableInfo.getFieldsName()));
+        TypeDescription typeDescription =
+                OrcSplitReaderUtil.logicalTypeToOrcType(
+                        RowType.of(tableInfo.getFieldsType(), tableInfo.getFieldsName()));
         this.oushuDBConfig = checkNotNull(oushuDBConfig, "oushuDBConfig is null");
         this.vectorizer = new RowDataVectorizer(typeDescription.toString(), types);
         this.writerFactory = new OrcBulkWriterFactory<>(this.vectorizer);
@@ -162,7 +145,8 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     private String getConfig(String key) throws IllegalArgumentException {
         String val = this.oushuDBConfig.getProperty(key);
         if (isNullOrEmpty(val)) {
-            throw new IllegalArgumentException(key + " must be supplied in the oushudb config properties.");
+            throw new IllegalArgumentException(
+                    key + " must be supplied in the oushudb config properties.");
         }
         return val;
     }
@@ -172,8 +156,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     }
 
     private void buildSQLConn() throws Exception {
-        if (this.connection != null)
-            return;
+        if (this.connection != null) return;
 
         String hostStr = getConfig(OUSHUDB_HOSTS);
         String port = getConfig(OUSHUDB_PORT);
@@ -204,11 +187,12 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         String transactionalId = availableTransactionalIds.poll();
         if (transactionalId == null) {
             throw new FlinkOushuDBException(
-                FlinkOushuDBErrorCode.WRITER_POOL_EMPTY,
-                "Too many ongoing snapshots. Increase kafka producers pool size or decrease number of concurrent checkpoints.");
+                    FlinkOushuDBErrorCode.WRITER_POOL_EMPTY,
+                    "Too many ongoing snapshots. Increase kafka producers pool size or decrease number of concurrent checkpoints.");
         }
 
-        return new FlinkOrcInternalWriter(transactionalId, writerFactory, tableInfo, temporary, connection, fs);
+        return new FlinkOrcInternalWriter(
+                transactionalId, writerFactory, tableInfo, temporary, connection, fs);
     }
 
     private void recycleTransactionalWriter(FlinkOrcInternalWriter writer) {
@@ -228,9 +212,9 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
             // prevent double throwing
             asyncException = null;
             throw new FlinkOushuDBException(
-                FlinkOushuDBErrorCode.EXTERNAL_ERROR,
-                "Failed to write data to orc file: " + e.getMessage(),
-                e);
+                    FlinkOushuDBErrorCode.EXTERNAL_ERROR,
+                    "Failed to write data to orc file: " + e.getMessage(),
+                    e);
         }
     }
 
@@ -240,7 +224,8 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     }
 
     @Override
-    protected void invoke(OushuDBTransactionState transaction, RowData value, Context context) throws Exception {
+    protected void invoke(OushuDBTransactionState transaction, RowData value, Context context)
+            throws Exception {
         checkErroneous();
         transaction.writer.addElement(value);
     }
@@ -266,14 +251,14 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
             }
             // Make sure all the producers for pending transactions are closed.
             pendingTransactions()
-                .forEach(
-                    transaction -> {
-                        try {
-                            transaction.getValue().writer.close();
-                        } catch (Throwable t) {
-                            LOG.warn("Error closing writer.", t);
-                        }
-                    });
+                    .forEach(
+                            transaction -> {
+                                try {
+                                    transaction.getValue().writer.close();
+                                } catch (Throwable t) {
+                                    LOG.warn("Error closing writer.", t);
+                                }
+                            });
             // make sure we propagate pending errors
             checkErroneous();
         }
@@ -285,7 +270,6 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         FlinkOrcInternalWriter writer = createTransactionalWriter();
         writer.beginTransactions();
         return new OushuDBTransactionState(writer.getTransactionalId(), writer);
-
     }
 
     @Override
@@ -293,7 +277,6 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         flush(transaction);
         checkErroneous();
     }
-
 
     @Override
     protected void commit(OushuDBTransactionState transaction) {
@@ -308,14 +291,21 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     protected void recoverAndCommit(OushuDBTransactionState transaction) {
         FlinkOrcInternalWriter writer = null;
         try {
-            writer = new FlinkOrcInternalWriter(transaction.transactionalId, writerFactory, tableInfo, temporary, connection, fs);
+            writer =
+                    new FlinkOrcInternalWriter(
+                            transaction.transactionalId,
+                            writerFactory,
+                            tableInfo,
+                            temporary,
+                            connection,
+                            fs);
             writer.commitTransaction();
         } catch (Exception ex) {
             LOG.warn(
-                "Encountered error {} while recovering transaction {}. "
-                    + "Presumably this transaction has been already committed before",
-                ex,
-                transaction);
+                    "Encountered error {} while recovering transaction {}. "
+                            + "Presumably this transaction has been already committed before",
+                    ex,
+                    transaction);
         } finally {
             if (writer != null) {
                 try {
@@ -337,7 +327,14 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     protected void recoverAndAbort(OushuDBTransactionState transaction) {
         FlinkOrcInternalWriter writer = null;
         try {
-            writer = new FlinkOrcInternalWriter(transaction.transactionalId, writerFactory, tableInfo, temporary, connection, fs);
+            writer =
+                    new FlinkOrcInternalWriter(
+                            transaction.transactionalId,
+                            writerFactory,
+                            tableInfo,
+                            temporary,
+                            connection,
+                            fs);
         } finally {
             if (writer != null) {
                 try {
@@ -365,8 +362,8 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         nextTransactionalIdHintState.clear();
         if (getRuntimeContext().getIndexOfThisSubtask() == 0) {
             checkState(
-                nextTransactionalIdHint != null,
-                "nextTransactionalIdHint must be set for EXACTLY_ONCE");
+                    nextTransactionalIdHint != null,
+                    "nextTransactionalIdHint must be set for EXACTLY_ONCE");
             long nextFreeTransactionalId = nextTransactionalIdHint.nextFreeTransactionalId;
 
             // If we scaled up, some (unknown) subtask must have created new transactional ids from
@@ -375,14 +372,14 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
             // used for this
             // scaling up.
             if (getRuntimeContext().getNumberOfParallelSubtasks()
-                > nextTransactionalIdHint.lastParallelism) {
-                nextFreeTransactionalId +=
-                    getRuntimeContext().getNumberOfParallelSubtasks();
+                    > nextTransactionalIdHint.lastParallelism) {
+                nextFreeTransactionalId += getRuntimeContext().getNumberOfParallelSubtasks();
             }
 
-            nextTransactionalIdHintState.add(new NextTransactionalIdHint(
-                getRuntimeContext().getNumberOfParallelSubtasks(),
-                nextFreeTransactionalId));
+            nextTransactionalIdHintState.add(
+                    new NextTransactionalIdHint(
+                            getRuntimeContext().getNumberOfParallelSubtasks(),
+                            nextFreeTransactionalId));
         }
     }
 
@@ -393,26 +390,27 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
             Path tempPath = new Path(temporary);
             fs = FileSystem.get(tempPath.toUri());
             if (!fs.exists(tempPath)) {
-                throw new NoSuchFileException(String.format("temp path [%s] not exists.", tempPath.toString()));
+                throw new NoSuchFileException(
+                        String.format("temp path [%s] not exists.", tempPath.toString()));
             }
         }
 
         nextTransactionalIdHintState =
-            context.getOperatorStateStore()
-                .getUnionListState(NEXT_TRANSACTIONAL_ID_HINT_DESCRIPTOR);
+                context.getOperatorStateStore()
+                        .getUnionListState(NEXT_TRANSACTIONAL_ID_HINT_DESCRIPTOR);
 
         transactionalIdsGenerator =
-            new TransactionalIdsGenerator(((StreamingRuntimeContext) getRuntimeContext())
-                .getOperatorUniqueID(),
-                getRuntimeContext().getIndexOfThisSubtask(),
-                getRuntimeContext().getNumberOfParallelSubtasks(),
-                poolSize,
-                SAFE_SCALE_DOWN_FACTOR);
+                new TransactionalIdsGenerator(
+                        ((StreamingRuntimeContext) getRuntimeContext()).getOperatorUniqueID(),
+                        getRuntimeContext().getIndexOfThisSubtask(),
+                        getRuntimeContext().getNumberOfParallelSubtasks(),
+                        poolSize,
+                        SAFE_SCALE_DOWN_FACTOR);
         ArrayList<FlinkOushuDBSink.NextTransactionalIdHint> transactionalIdHints =
-            Lists.newArrayList(nextTransactionalIdHintState.get());
+                Lists.newArrayList(nextTransactionalIdHintState.get());
         if (transactionalIdHints.size() > 1) {
             throw new IllegalStateException(
-                "There should be at most one next transactional id hint written by the first subtask");
+                    "There should be at most one next transactional id hint written by the first subtask");
         } else if (transactionalIdHints.size() == 0) {
             nextTransactionalIdHint = new NextTransactionalIdHint(0, 0);
 
@@ -436,7 +434,8 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     }
 
     @Override
-    protected void finishRecoveringContext(Collection<OushuDBTransactionState> handledTransactions) {
+    protected void finishRecoveringContext(
+            Collection<OushuDBTransactionState> handledTransactions) {
         cleanUpUserContext(handledTransactions);
         resetAvailableTransactionalIdsPool(getUserContext().get().transactionalIds);
         LOG.info("Recovered transactionalIds {}", getUserContext().get().transactionalIds);
@@ -447,7 +446,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
      * have been completed.
      *
      * @param handledTransactions transactions which were already committed or aborted and do not
-     *                            need further handling
+     *     need further handling
      */
     private void cleanUpUserContext(Collection<OushuDBTransactionState> handledTransactions) {
         if (!getUserContext().isPresent()) {
@@ -455,19 +454,19 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         }
         HashSet<String> abortTransactions = new HashSet<>(getUserContext().get().transactionalIds);
         handledTransactions.forEach(
-            kafkaTransactionState ->
-                abortTransactions.remove(kafkaTransactionState.transactionalId));
+                kafkaTransactionState ->
+                        abortTransactions.remove(kafkaTransactionState.transactionalId));
         abortTransactions(abortTransactions);
     }
 
     private Set<String> generateNewTransactionalIds() {
         checkState(
-            nextTransactionalIdHint != null,
-            "nextTransactionalIdHint must be present for EXACTLY_ONCE");
+                nextTransactionalIdHint != null,
+                "nextTransactionalIdHint must be present for EXACTLY_ONCE");
 
         Set<String> transactionalIds =
-            transactionalIdsGenerator.generateIdsToUse(
-                nextTransactionalIdHint.nextFreeTransactionalId);
+                transactionalIdsGenerator.generateIdsToUse(
+                        nextTransactionalIdHint.nextFreeTransactionalId);
         LOG.info("Generated new transactionalIds {}", transactionalIds);
         return transactionalIds;
     }
@@ -478,29 +477,28 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     }
 
     private void abortTransactions(final Set<String> transactionalIds) {
-        transactionalIds.parallelStream().forEach(
-            transactionalId -> {
-                Path temp = new Path(temporary, transactionalId);
-                try {
-                    fs.delete(temp, true);
-                } catch (IOException e) {
-                    LOG.warn("failed to delete temporary folder " + temp.toString());
-                }
-            }
-        );
+        transactionalIds
+                .parallelStream()
+                .forEach(
+                        transactionalId -> {
+                            Path temp = new Path(temporary, transactionalId);
+                            try {
+                                fs.delete(temp, true);
+                            } catch (IOException e) {
+                                LOG.warn("failed to delete temporary folder " + temp.toString());
+                            }
+                        });
     }
 
     public static class OushuDBTransactionState {
 
         private final transient FlinkOrcInternalWriter writer;
 
-        @Nullable
-        final String transactionalId;
+        @Nullable final String transactionalId;
 
         @VisibleForTesting
         public OushuDBTransactionState(
-            @Nullable String transactionalId,
-            FlinkOrcInternalWriter writer) {
+                @Nullable String transactionalId, FlinkOrcInternalWriter writer) {
             this.transactionalId = transactionalId;
             this.writer = writer;
         }
@@ -511,8 +509,8 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
 
         @Override
         public String toString() {
-            return String.format("%s [transactionalId=%s]",
-                this.getClass().getSimpleName(), transactionalId);
+            return String.format(
+                    "%s [transactionalId=%s]", this.getClass().getSimpleName(), transactionalId);
         }
 
         @Override
@@ -559,7 +557,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     @VisibleForTesting
     @Internal
     public static class TransactionStateSerializer
-        extends TypeSerializerSingleton<OushuDBTransactionState> {
+            extends TypeSerializerSingleton<OushuDBTransactionState> {
 
         private static final long serialVersionUID = 1L;
 
@@ -574,15 +572,13 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         }
 
         @Override
-        public OushuDBTransactionState copy(
-            OushuDBTransactionState from) {
+        public OushuDBTransactionState copy(OushuDBTransactionState from) {
             return from;
         }
 
         @Override
         public OushuDBTransactionState copy(
-            OushuDBTransactionState from,
-            OushuDBTransactionState reuse) {
+                OushuDBTransactionState from, OushuDBTransactionState reuse) {
             return from;
         }
 
@@ -592,9 +588,8 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         }
 
         @Override
-        public void serialize(
-                OushuDBTransactionState record, DataOutputView target)
-            throws IOException {
+        public void serialize(OushuDBTransactionState record, DataOutputView target)
+                throws IOException {
             if (record.transactionalId == null) {
                 target.writeBoolean(false);
             } else {
@@ -604,8 +599,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         }
 
         @Override
-        public OushuDBTransactionState deserialize(DataInputView source)
-            throws IOException {
+        public OushuDBTransactionState deserialize(DataInputView source) throws IOException {
             String transactionalId = null;
             if (source.readBoolean()) {
                 transactionalId = source.readUTF();
@@ -615,8 +609,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
 
         @Override
         public OushuDBTransactionState deserialize(
-                OushuDBTransactionState reuse, DataInputView source)
-            throws IOException {
+                OushuDBTransactionState reuse, DataInputView source) throws IOException {
             return deserialize(source);
         }
 
@@ -634,17 +627,14 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         // -----------------------------------------------------------------------------------
 
         @Override
-        public TypeSerializerSnapshot<OushuDBTransactionState>
-        snapshotConfiguration() {
+        public TypeSerializerSnapshot<OushuDBTransactionState> snapshotConfiguration() {
             return new TransactionStateSerializerSnapshot();
         }
 
-        /**
-         * Serializer configuration snapshot for compatibility and format evolution.
-         */
+        /** Serializer configuration snapshot for compatibility and format evolution. */
         @SuppressWarnings("WeakerAccess")
         public static final class TransactionStateSerializerSnapshot
-            extends SimpleTypeSerializerSnapshot<OushuDBTransactionState> {
+                extends SimpleTypeSerializerSnapshot<OushuDBTransactionState> {
 
             public TransactionStateSerializerSnapshot() {
                 super(TransactionStateSerializer::new);
@@ -659,7 +649,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     @VisibleForTesting
     @Internal
     public static class ContextStateSerializer
-        extends TypeSerializerSingleton<OushuDBTransactionContext> {
+            extends TypeSerializerSingleton<OushuDBTransactionContext> {
 
         private static final long serialVersionUID = 1L;
 
@@ -674,15 +664,13 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         }
 
         @Override
-        public OushuDBTransactionContext copy(
-            OushuDBTransactionContext from) {
+        public OushuDBTransactionContext copy(OushuDBTransactionContext from) {
             return from;
         }
 
         @Override
         public OushuDBTransactionContext copy(
-            OushuDBTransactionContext from,
-            OushuDBTransactionContext reuse) {
+                OushuDBTransactionContext from, OushuDBTransactionContext reuse) {
             return from;
         }
 
@@ -692,9 +680,8 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         }
 
         @Override
-        public void serialize(
-                OushuDBTransactionContext record, DataOutputView target)
-            throws IOException {
+        public void serialize(OushuDBTransactionContext record, DataOutputView target)
+                throws IOException {
             int numIds = record.transactionalIds.size();
             target.writeInt(numIds);
             for (String id : record.transactionalIds) {
@@ -703,8 +690,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         }
 
         @Override
-        public OushuDBTransactionContext deserialize(DataInputView source)
-            throws IOException {
+        public OushuDBTransactionContext deserialize(DataInputView source) throws IOException {
             int numIds = source.readInt();
             Set<String> ids = new HashSet<>(numIds);
             for (int i = 0; i < numIds; i++) {
@@ -715,8 +701,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
 
         @Override
         public OushuDBTransactionContext deserialize(
-                OushuDBTransactionContext reuse, DataInputView source)
-            throws IOException {
+                OushuDBTransactionContext reuse, DataInputView source) throws IOException {
             return deserialize(source);
         }
 
@@ -736,12 +721,10 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
             return new ContextStateSerializerSnapshot();
         }
 
-        /**
-         * Serializer configuration snapshot for compatibility and format evolution.
-         */
+        /** Serializer configuration snapshot for compatibility and format evolution. */
         @SuppressWarnings("WeakerAccess")
         public static final class ContextStateSerializerSnapshot
-            extends SimpleTypeSerializerSnapshot<OushuDBTransactionContext> {
+                extends SimpleTypeSerializerSnapshot<OushuDBTransactionContext> {
 
             public ContextStateSerializerSnapshot() {
                 super(ContextStateSerializer::new);
@@ -749,9 +732,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         }
     }
 
-    /**
-     * Keep information required to deduce next safe to use transactional id.
-     */
+    /** Keep information required to deduce next safe to use transactional id. */
     public static class NextTransactionalIdHint {
         public int lastParallelism = 0;
         public long nextFreeTransactionalId = 0;
@@ -768,11 +749,11 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         @Override
         public String toString() {
             return "NextTransactionalIdHint["
-                + "lastParallelism="
-                + lastParallelism
-                + ", nextFreeTransactionalId="
-                + nextFreeTransactionalId
-                + ']';
+                    + "lastParallelism="
+                    + lastParallelism
+                    + ", nextFreeTransactionalId="
+                    + nextFreeTransactionalId
+                    + ']';
         }
 
         @Override
@@ -796,8 +777,8 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
         public int hashCode() {
             int result = lastParallelism;
             result =
-                31 * result
-                    + (int) (nextFreeTransactionalId ^ (nextFreeTransactionalId >>> 32));
+                    31 * result
+                            + (int) (nextFreeTransactionalId ^ (nextFreeTransactionalId >>> 32));
             return result;
         }
     }
@@ -809,7 +790,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
     @VisibleForTesting
     @Internal
     public static class NextTransactionalIdHintSerializer
-        extends TypeSerializerSingleton<NextTransactionalIdHint> {
+            extends TypeSerializerSingleton<NextTransactionalIdHint> {
 
         private static final long serialVersionUID = 1L;
 
@@ -830,7 +811,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
 
         @Override
         public NextTransactionalIdHint copy(
-            NextTransactionalIdHint from, NextTransactionalIdHint reuse) {
+                NextTransactionalIdHint from, NextTransactionalIdHint reuse) {
             return from;
         }
 
@@ -841,7 +822,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
 
         @Override
         public void serialize(NextTransactionalIdHint record, DataOutputView target)
-            throws IOException {
+                throws IOException {
             target.writeLong(record.nextFreeTransactionalId);
             target.writeInt(record.lastParallelism);
         }
@@ -855,7 +836,7 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
 
         @Override
         public NextTransactionalIdHint deserialize(
-            NextTransactionalIdHint reuse, DataInputView source) throws IOException {
+                NextTransactionalIdHint reuse, DataInputView source) throws IOException {
             return deserialize(source);
         }
 
@@ -870,12 +851,10 @@ public class FlinkOushuDBSink extends TwoPhaseCommitSinkFunction<RowData, FlinkO
             return new NextTransactionalIdHintSerializerSnapshot();
         }
 
-        /**
-         * Serializer configuration snapshot for compatibility and format evolution.
-         */
+        /** Serializer configuration snapshot for compatibility and format evolution. */
         @SuppressWarnings("WeakerAccess")
         public static final class NextTransactionalIdHintSerializerSnapshot
-            extends SimpleTypeSerializerSnapshot<NextTransactionalIdHint> {
+                extends SimpleTypeSerializerSnapshot<NextTransactionalIdHint> {
 
             public NextTransactionalIdHintSerializerSnapshot() {
                 super(NextTransactionalIdHintSerializer::new);

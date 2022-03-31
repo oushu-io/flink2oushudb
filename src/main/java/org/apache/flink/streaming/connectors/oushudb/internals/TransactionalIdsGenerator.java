@@ -31,11 +31,11 @@ public class TransactionalIdsGenerator {
     private final int safeScaleDownFactor;
 
     public TransactionalIdsGenerator(
-        String prefix,
-        int subtaskIndex,
-        int totalNumberOfSubtasks,
-        int poolSize,
-        int safeScaleDownFactor) {
+            String prefix,
+            int subtaskIndex,
+            int totalNumberOfSubtasks,
+            int poolSize,
+            int safeScaleDownFactor) {
         checkArgument(subtaskIndex < totalNumberOfSubtasks);
         checkArgument(poolSize > 0);
         checkArgument(safeScaleDownFactor > 0);

@@ -3,9 +3,7 @@ package org.apache.flink.streaming.connectors.oushudb;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.util.FlinkException;
 
-/**
- * Exception used by {@link FlinkOushuDBSink}
- */
+/** Exception used by {@link FlinkOushuDBSink} */
 @PublicEvolving
 public class FlinkOushuDBException extends FlinkException {
     private static final long serialVersionUID = -1085986719803605287L;

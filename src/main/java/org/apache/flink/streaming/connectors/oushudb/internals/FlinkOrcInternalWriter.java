@@ -9,6 +9,7 @@ import org.apache.flink.orc.writer.OrcBulkWriterFactory;
 import org.apache.flink.streaming.connectors.oushudb.FlinkOushuDBErrorCode;
 import org.apache.flink.streaming.connectors.oushudb.FlinkOushuDBException;
 import org.apache.flink.table.data.RowData;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,18 +33,16 @@ public class FlinkOrcInternalWriter {
     private final OushuDBTableInfo tableInfo;
     private final String temporary;
     private final FileSystem fs;
-    /**
-     * Number of unacknowledged records.
-     */
+    /** Number of unacknowledged records. */
     protected final AtomicLong pendingRecords = new AtomicLong();
 
-    public FlinkOrcInternalWriter(String transactionalId,
-                                  OrcBulkWriterFactory<RowData> writer,
-                                  OushuDBTableInfo tableInfo,
-                                  String temporary,
-                                  Connection connection,
-                                  FileSystem fs
-    ) {
+    public FlinkOrcInternalWriter(
+            String transactionalId,
+            OrcBulkWriterFactory<RowData> writer,
+            OushuDBTableInfo tableInfo,
+            String temporary,
+            Connection connection,
+            FileSystem fs) {
         this.transactionalId = transactionalId;
         this.writerFactory = writer;
         this.tableInfo = tableInfo;
@@ -60,8 +59,9 @@ public class FlinkOrcInternalWriter {
             ensureNotClosed();
             tempDir = new Path(temporary, transactionalId);
             if (!fs.mkdirs(tempDir)) {
-                throw new FlinkOushuDBException(FlinkOushuDBErrorCode.EXTERNAL_ERROR,
-                    "failed to create temp folder " + tempDir.toString());
+                throw new FlinkOushuDBException(
+                        FlinkOushuDBErrorCode.EXTERNAL_ERROR,
+                        "failed to create temp folder " + tempDir.toString());
             }
             LOG.info("Created temporary folder {}", tempDir.toString());
             Path outFile = new Path(tempDir, UUID.randomUUID().toString());
@@ -85,7 +85,6 @@ public class FlinkOrcInternalWriter {
             }
         }
     }
-
 
     public void abortTransaction() throws RuntimeException {
         synchronized (producerClosingLock) {
@@ -133,9 +132,9 @@ public class FlinkOrcInternalWriter {
     private void ensureNotClosed() {
         if (closed) {
             throw new IllegalStateException(
-                String.format(
-                    "The writer %s has already been closed",
-                    System.identityHashCode(this)));
+                    String.format(
+                            "The writer %s has already been closed",
+                            System.identityHashCode(this)));
         }
     }
 
