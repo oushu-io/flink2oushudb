@@ -55,7 +55,8 @@ public class OushuDBTableInfo implements Serializable {
     public void createTable() throws Exception {
         checkConnection();
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("create table %s.%s (", withQuotation(schema), withQuotation(table)));
+        sb.append(
+                String.format("create table %s.%s (", withQuotation(schema), withQuotation(table)));
         for (Field field : fields) {
             sb.append(String.format("%s %s,", field.name, field.typeStr()));
         }
@@ -78,7 +79,8 @@ public class OushuDBTableInfo implements Serializable {
 
     public void checkConnection() throws FlinkOushuDBException {
         if (connection == null) {
-            throw new FlinkOushuDBException(FlinkOushuDBErrorCode.EXTERNAL_ERROR, "connection is null");
+            throw new FlinkOushuDBException(
+                    FlinkOushuDBErrorCode.EXTERNAL_ERROR, "connection is null");
         }
     }
 
@@ -86,8 +88,11 @@ public class OushuDBTableInfo implements Serializable {
     public boolean exists() throws Exception {
         checkConnection();
 
-        String existsSql = String.format("select count(1) as cnt from information_schema.tables " +
-                "where table_schema = '%s' and table_name = '%s';", schema, table);
+        String existsSql =
+                String.format(
+                        "select count(1) as cnt from information_schema.tables "
+                                + "where table_schema = '%s' and table_name = '%s';",
+                        schema, table);
         PreparedStatement prst = null;
         try {
             prst = connection.prepareStatement(existsSql);
@@ -106,29 +111,36 @@ public class OushuDBTableInfo implements Serializable {
 
     public void checkCompatibility() throws Exception {
         checkConnection();
-        String typeSql = String.format("select column_name, data_type, character_maximum_length, numeric_precision, numeric_scale from information_schema.columns " +
-                "where table_schema='%s' and table_name = '%s' order by ordinal_position;", schema, table);
+        String typeSql =
+                String.format(
+                        "select column_name, data_type, character_maximum_length, numeric_precision, numeric_scale from information_schema.columns "
+                                + "where table_schema='%s' and table_name = '%s' order by ordinal_position;",
+                        schema, table);
         PreparedStatement prst = null;
         try {
             prst = connection.prepareStatement(typeSql);
             ResultSet result = prst.executeQuery();
             List<DBField> fields = new ArrayList<>();
             while (result.next()) {
-                fields.add(new DBField(
-                        result.getString("column_name"),
-                        result.getString("data_type"),
-                        result.getInt("character_maximum_length"),
-                        result.getInt("numeric_precision"),
-                        result.getInt("numeric_scale")
-                ));
+                fields.add(
+                        new DBField(
+                                result.getString("column_name"),
+                                result.getString("data_type"),
+                                result.getInt("character_maximum_length"),
+                                result.getInt("numeric_precision"),
+                                result.getInt("numeric_scale")));
             }
 
             for (int i = 0; i < this.fields.length; i++) {
                 DBField df = fields.get(i);
                 Field f = this.fields[i];
                 if (!f.typeStr().equals(df.typeStr())) {
-                    throw new FlinkOushuDBException(FlinkOushuDBErrorCode.EXTERNAL_ERROR, "Insert data type " + f.typeStr() +
-                            " is incompatible with table type " + df.typeStr());
+                    throw new FlinkOushuDBException(
+                            FlinkOushuDBErrorCode.EXTERNAL_ERROR,
+                            "Insert data type "
+                                    + f.typeStr()
+                                    + " is incompatible with table type "
+                                    + df.typeStr());
                 }
             }
         } finally {
@@ -137,7 +149,6 @@ public class OushuDBTableInfo implements Serializable {
             }
         }
     }
-
 
     public String withQuotation(String val) {
         return String.format("\"%s\"", val);
@@ -150,7 +161,9 @@ public class OushuDBTableInfo implements Serializable {
 
         try {
             connection.setAutoCommit(false);
-            statement = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+            statement =
+                    connection.createStatement(
+                            ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
             StringBuilder sb = new StringBuilder();
             // create external table
             sb.append("create readable external table ");
@@ -222,10 +235,11 @@ public class OushuDBTableInfo implements Serializable {
                 case BINARY:
                 case VARBINARY:
                     return "bytea";
-                case DECIMAL: {
-                    DecimalType dt = (DecimalType) type;
-                    return String.format("numeric(%d, %d)", dt.getPrecision(), dt.getScale());
-                }
+                case DECIMAL:
+                    {
+                        DecimalType dt = (DecimalType) type;
+                        return String.format("numeric(%d, %d)", dt.getPrecision(), dt.getScale());
+                    }
                 case TINYINT:
                 case SMALLINT:
                     return "smallint";
@@ -270,7 +284,7 @@ public class OushuDBTableInfo implements Serializable {
                 case "numeric":
                     return String.format("numeric(%d, %d)", precision, scale);
                 case "character varying":
-                    if(charMaxLen > 0 ) {
+                    if (charMaxLen > 0) {
                         return String.format("varchar(%d)", charMaxLen);
                     }
                     return "varchar";
