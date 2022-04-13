@@ -226,8 +226,8 @@ public class OushuDBTableInfo implements Serializable {
                     return String.format("char(%d)", ((CharType) type).getLength());
                 case VARCHAR:
                     int len = ((VarCharType) type).getLength();
-                    if (len == 2147483647) {
-                        return "varchar";
+                    if (len == Integer.MAX_VALUE) {
+                        return "text";
                     }
                     return String.format("varchar(%d)", len);
                 case BOOLEAN:
@@ -285,9 +285,10 @@ public class OushuDBTableInfo implements Serializable {
                     return String.format("numeric(%d, %d)", precision, scale);
                 case "character varying":
                     if (charMaxLen > 0) {
-                        return String.format("varchar(%d)", charMaxLen);
+                        if (charMaxLen != Integer.MAX_VALUE)
+                            return String.format("varchar(%d)", charMaxLen);
                     }
-                    return "varchar";
+                    return "text";
                 case "character":
                     return String.format("char(%d)", charMaxLen);
                 default:
