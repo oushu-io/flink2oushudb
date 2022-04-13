@@ -104,3 +104,24 @@ public class Demo {
 ## 支持版本
 Apache Flink v1.13.0 至最新版本
 
+## 附：编译Flink v1.14.3版本时的编译问题及解决方法
+
+```bash
+mvn deploy -Pscala-2.12 -Dcheckstyle.skip -DskipTests=true    
+```
+
+```bash
+[ERROR] Failed to execute goal org.commonjava.maven.plugins:directory-maven-plugin:0.1:directory-of (directories) on project flink-connector-oushudb_2.12: Cannot find directory for project: org.apache.flink:flink-parent 
+```
+修改flink-parnet-1.14.3.pom的```directory-maven-plugin```
+```
+<goal>highest-basedir</goal>
+```
+
+```bash
+[INFO] --- maven-enforcer-plugin:3.0.0-M1:enforce (enforce-versions) @ flink-connector-oushudb_2.12 ---
+[WARNING] Rule 0: org.apache.maven.plugins.enforcer.BannedDependencies failed with message:
+Scala 2.10/2.11 dependencies are not allowed for Scala 2.12 builds. This can be caused by hard-coded scala versions, where the 'scala.binary.version' property should be used instead.
+```
+修改flink-parnet-1.14.3.pom的```directory-maven-plugin```，
+找到两个maven-enforcer-plugin的配置，并注释掉

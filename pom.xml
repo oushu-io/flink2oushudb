@@ -10,7 +10,7 @@
 		<version>1.14.3</version>
 	</parent>
 
-	<artifactId>flink-connector-oushudb_2.11</artifactId>
+	<artifactId>flink-connector-oushudb_2.12</artifactId>
 	<name>Flink : Connectors : OushuDB</name>
 
 	<packaging>jar</packaging>
